@@ -7,8 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
+	"github.com/vasiliy-maslov/wallet-app/internal/app"
 	"github.com/vasiliy-maslov/wallet-app/internal/config"
 	"github.com/vasiliy-maslov/wallet-app/pkg/postgres"
 )
@@ -23,6 +23,9 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.Application.LogLevel}))
 	slog.SetDefault(logger)
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	dsnStr := fmt.Sprintf("postgresql://%s:%s@%s/%s?sslmode=false",
 		cfg.Postgres.User,
 		cfg.Postgres.Password,
@@ -30,19 +33,19 @@ func main() {
 		cfg.Postgres.Name,
 	)
 
-	db, err := postgres.NewPostgresDB(context.Background(), dsnStr)
+	db, err := postgres.NewPostgresDB(ctx, dsnStr)
 	if err != nil {
 		slog.Error("cannot connect to db", slog.Any("error", err))
 		os.Exit(1)
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	application := app.New(logger, db)
 
-	<-ctx.Done()
+	if err := application.Run(ctx); err != nil {
+		slog.Error("application run failed", slog.Any("error", err))
+		os.Exit(1)
+	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	slog.Info("application stopped gracefully")
 
-	fmt.Println("Application started")
 }
