@@ -1,0 +1,14 @@
+# Compiled binary
+wallet-app
+
+# Postgres data volume
+.postgres_data/
+
+# IDE files
+.idea/
+.vscode/
+
+# Mac files
+.DS_Store
+
+# config.env
